@@ -7,9 +7,10 @@ Baseline: `df8b78055a203dbb3d571b5b15ad08b13ec12b68`
 
 - `packages/pi-btw`
 - `packages/pi-goal`
-- `packages/pi-lsp`
 - `packages/pi-plan-mode`
 - `packages/pi-sync`
+
+`packages/pi-lsp` stays in the tree but is not loaded.
 
 `@narumitw/pi-tui-kit` is a library used by several of the above. It is not a Pi extension.
 
