@@ -7,5 +7,7 @@ export default function (pi: ExtensionAPI) {
 		type: "boolean",
 		default: false,
 	});
-	installDeferred(pi, () => import("./index.js"));
+	installDeferred(pi, () => import("./index.js"), {
+		commands: [{ name: "plan", description: "Enter or manage Codex-like Plan mode" }],
+	});
 }
