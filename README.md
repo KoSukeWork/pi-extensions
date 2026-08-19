@@ -1,6 +1,6 @@
 # 🧩 Pi Extensions for the Pi Coding Agent
 
-> **Certification fork:** `git:` install of this repository loads only `pi-btw`, `pi-goal`, `pi-plan-mode`, and `pi-sync`. Other packages (including `pi-lsp`) remain in the tree for upstream sync but are not in `package.json` `pi.extensions`. See [CERTIFICATION.md](./CERTIFICATION.md).
+> **Certification fork:** this tree contains only `pi-btw`, `pi-goal`, `pi-plan-mode`, `pi-sync`, and the `pi-tui-kit` library. See [CERTIFICATION.md](./CERTIFICATION.md).
 
 [![npm scope](https://img.shields.io/badge/npm-@narumitw-blue)](https://www.npmjs.com/org/narumitw) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 

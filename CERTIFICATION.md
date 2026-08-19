@@ -10,7 +10,7 @@ Baseline: `df8b78055a203dbb3d571b5b15ad08b13ec12b68`
 - `packages/pi-plan-mode`
 - `packages/pi-sync`
 
-`packages/pi-lsp` stays in the tree but is not loaded.
+The repository tree is trimmed to those four extensions plus the `pi-tui-kit` library.
 
 `@narumitw/pi-tui-kit` is a library used by several of the above. It is not a Pi extension.
 
