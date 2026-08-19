@@ -138,7 +138,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+dist/*
 .output
 
 # Gatsby files
@@ -204,3 +204,7 @@ vite.config.ts.timestamp-*
 .pi/agent/
 docs/plans/archived/
 docs/roadmaps/archived/
+
+# Keep compiled extension entrypoints (git install has no build step)
+!dist/*.js
+!**/dist/*.js
