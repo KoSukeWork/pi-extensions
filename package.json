@@ -14,9 +14,9 @@
 	"pi": {
 		"extensions": [
 			"./packages/pi-btw/src/index.ts",
-			"./packages/pi-goal/src/index.ts",
-			"./packages/pi-plan-mode/src/index.ts",
-			"./packages/pi-sync/src/index.ts"
+			"./packages/pi-goal/src/bootstrap.ts",
+			"./packages/pi-plan-mode/src/bootstrap.ts",
+			"./packages/pi-sync/src/bootstrap.ts"
 		]
 	},
 	"scripts": {
