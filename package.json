@@ -13,10 +13,10 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/pi-btw/dist/extension.js",
-      "./packages/pi-goal/dist/bootstrap.js",
-      "./packages/pi-plan-mode/dist/bootstrap.js",
-      "./packages/pi-sync/dist/bootstrap.js"
+      "./packages/pi-btw/src/index.ts",
+      "./packages/pi-goal/src/bootstrap.ts",
+      "./packages/pi-plan-mode/src/bootstrap.ts",
+      "./packages/pi-sync/src/bootstrap.ts"
     ]
   },
   "scripts": {

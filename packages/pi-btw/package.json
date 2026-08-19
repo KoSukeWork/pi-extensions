@@ -20,7 +20,7 @@
   ],
   "pi": {
     "extensions": [
-      "./dist/extension.js"
+      "./src/index.ts"
     ]
   },
   "piExtension": {
