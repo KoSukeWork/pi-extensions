@@ -56,7 +56,7 @@ Run commands from the repository root unless a command says otherwise.
 - Do not make reusable libraries coordinate specific extensions.
 - Consume shared Pi APIs without extension-specific branches.
 - Give every active extension a thin `src/index.ts` default-export forwarder.
-- Declare exactly `"pi": { "extensions": ["./src/index.ts"] }` in every active extension manifest.
+- Declare `"pi": { "extensions": ["./src/index.ts"] }` or, for deferred load, `["./src/bootstrap.ts"]` that stubs commands and lazy-imports the index factory.
 - Keep extension implementation in descriptively named modules.
 - Build and publish reusable libraries as JavaScript with declarations through their own build configuration and without `pi.extensions`.
 - Run `npm run check:boundaries` to verify package boundaries.

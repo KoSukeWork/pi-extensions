@@ -129,8 +129,9 @@ interactive work should expose cancellation.
   from libraries. The private root Pi manifest must list every stable extension entrypoint and no
   experimental entrypoint so direct Git installation preserves the lifecycle boundary.
   **Verification:** `Validator` via `npm run check:boundaries` plus `Review` of lifecycle moves.
-- **MUST:** Give every active extension a thin `src/index.ts` default-export forwarder and declare
-  exactly `"pi": { "extensions": ["./src/index.ts"] }`; keep implementation in descriptive modules.
+- **MUST:** Give every active extension a thin `src/index.ts` default-export forwarder. Declare
+  `"pi": { "extensions": ["./src/index.ts"] }`, or `["./src/bootstrap.ts"]` when the package defers
+  the heavy factory behind a command-stubbing bootstrap; keep implementation in descriptive modules.
   Reusable libraries must not declare `pi.extensions` or `piExtension` and must publish built
   JavaScript plus declarations. **Verification:** `Validator` via `npm run check:boundaries` and a
   clean-build package smoke.
@@ -283,7 +284,7 @@ fragile regular expressions. Until then, label the real verification method hone
 
 - [ ] Place the package under `packages/`, declare the correct extension lifecycle when applicable,
       and keep it independently installable.
-- [ ] Add the thin `src/index.ts` forwarder and canonical `pi.extensions` manifest entry.
+- [ ] Add the thin `src/index.ts` forwarder and canonical `pi.extensions` manifest entry (`./src/index.ts` or deferred `./src/bootstrap.ts`).
 - [ ] Separate factory registration from session-owned startup and idempotent shutdown cleanup.
 - [ ] Choose the primary command and no-argument behavior from the extension's product role; use a
       menu-first manager unless a concrete reason supports another shape, and add direct routes only

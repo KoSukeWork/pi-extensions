@@ -1,5 +1,11 @@
 # @narumitw/pi-btw
 
+## 0.54.3
+
+### Patch Changes
+
+- Defer the heavy `/btw` factory behind a thin bootstrap so interactive startup no longer compiles the side-thread UI graph up front. Slash-command stubs still register `/btw` immediately.
+
 ## 0.54.1
 
 ### Patch Changes

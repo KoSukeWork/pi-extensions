@@ -117,15 +117,23 @@ function findWorkspacePackages(directory) {
 	return packages.sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function packagePiEntry(extensionPackage) {
+	const entries = extensionPackage.packageJson.pi?.extensions;
+	if (!Array.isArray(entries) || entries.length !== 1) return null;
+	const entry = entries[0];
+	if (entry !== "./src/index.ts" && entry !== "./src/bootstrap.ts") return null;
+	return entry;
+}
+
 function checkRootPiManifest() {
 	const expectedEntries = activePackages
 		.filter(({ packageJson }) => packageJson.piExtension?.lifecycle === "stable")
-		.map(
-			({ directory }) =>
-				`./${relative(path.join(directory, "src", "index.ts"))
-					.split(path.sep)
-					.join("/")}`,
-		)
+		.map((extensionPackage) => {
+			const entry = packagePiEntry(extensionPackage) ?? "./src/index.ts";
+			return `./${relative(path.join(extensionPackage.directory, entry.slice(2)))
+				.split(path.sep)
+				.join("/")}`;
+		})
 		.sort();
 	const actualEntries = rootPackage.pi?.extensions;
 	if (
@@ -187,11 +195,16 @@ function checkPiEntrypoint(extensionPackage) {
 		}
 	}
 
-	const entries = extensionPackage.packageJson.pi?.extensions;
-	if (!Array.isArray(entries) || entries.length !== 1 || entries[0] !== "./src/index.ts") {
+	const entry = packagePiEntry(extensionPackage);
+	if (!entry) {
 		failures.push(
-			`${relative(extensionPackage.packagePath)} pi.extensions must be ["./src/index.ts"].`,
+			`${relative(extensionPackage.packagePath)} pi.extensions must be ["./src/index.ts"] or ["./src/bootstrap.ts"].`,
 		);
+		return;
+	}
+	const declaredEntrypoint = path.join(extensionPackage.directory, entry);
+	if (!fs.existsSync(declaredEntrypoint)) {
+		failures.push(`${relative(declaredEntrypoint)} must exist as the Pi extension entrypoint.`);
 	}
 }
 

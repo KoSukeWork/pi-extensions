@@ -1,6 +1,6 @@
 # 🧩 Pi Extensions for the Pi Coding Agent
 
-> **Certification fork:** this tree contains only `pi-btw`, `pi-goal`, `pi-plan-mode`, `pi-sync`, and the `pi-tui-kit` library. See [CERTIFICATION.md](./CERTIFICATION.md).
+> **Certification fork:** this tree contains only `pi-btw`, `pi-plan-mode`, `pi-sync`, and the `pi-tui-kit` library. See [CERTIFICATION.md](./CERTIFICATION.md). `pi-goal` was dropped because it overlaps certified `pi-dynamic-workflows`.
 
 [![npm scope](https://img.shields.io/badge/npm-@narumitw-blue)](https://www.npmjs.com/org/narumitw) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
@@ -15,7 +15,7 @@ Install only what you need. Every package is published separately under the `@na
 Install an extension permanently:
 
 ```bash
-pi install npm:@narumitw/pi-goal
+pi install npm:@narumitw/pi-plan-mode
 ```
 
 Try one without adding it permanently:
@@ -27,7 +27,7 @@ pi -e npm:@narumitw/pi-statusline
 Combine multiple extensions:
 
 ```bash
-pi -e npm:@narumitw/pi-goal \
+pi -e npm:@narumitw/pi-plan-mode \
   -e npm:@narumitw/pi-statusline \
   -e npm:@narumitw/pi-lsp
 ```
@@ -59,7 +59,6 @@ pi -e npm:@narumitw/pi-goal \
 | --- | --- | --- |
 | [`pi-btw`](./packages/pi-btw) | Ask a quick `/btw` side question without adding it to the main conversation. | `pi install npm:@narumitw/pi-btw` |
 | [`pi-caffeinate`](./packages/pi-caffeinate) | Prevent system sleep while Pi processes a long-running prompt. | `pi install npm:@narumitw/pi-caffeinate` |
-| [`pi-goal`](./packages/pi-goal) | Keep the agent working until a goal is verified complete; optionally enable an experimental ordered queue. | `pi install npm:@narumitw/pi-goal` |
 | [`pi-worktree`](./packages/pi-worktree) | Create, switch, remove, and prune Git worktrees while carrying the Pi session into another workspace. | `pi install npm:@narumitw/pi-worktree` |
 
 ### Accounts and data
@@ -161,8 +160,8 @@ npm run check
 Use the generic Just recipes with an unscoped extension name:
 
 ```bash
-just try goal
-just pack goal
+just try plan-mode
+just pack plan-mode
 
 # Experimental packages use the same recipes
 just try file-context
@@ -201,7 +200,7 @@ npm run changeset
 After changesets reach `main`, the release workflow creates or updates one version pull request. That
 pull request changes only selected package versions, dependency ranges where configured, changelogs,
 and the lockfile. Merging it publishes the new versions with npm provenance and creates
-package-specific tags and GitHub releases such as `@narumitw/pi-goal@0.50.0`.
+package-specific tags and GitHub releases such as `@narumitw/pi-plan-mode@0.50.0`.
 
 Repository-only documentation, tests, tooling, and path migrations may omit a changeset. Use
 `npm run changeset:status` to inspect pending releases. Versioning and publication run through the

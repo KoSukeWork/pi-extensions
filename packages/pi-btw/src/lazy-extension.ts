@@ -30,7 +30,7 @@ const BLOCKING_EVENTS = [
 type ExtensionFactory = (pi: ExtensionAPI) => unknown;
 type CommandHandler = (args: string, ctx: unknown) => unknown;
 type CompletionItem = { value: string; label: string; description?: string };
-type CompletionsFn = (prefix: string) => CompletionItem[] | null | undefined;
+type CompletionsFn = (prefix: string) => CompletionItem[] | Promise<CompletionItem[] | null> | null;
 
 export type DeferredCommand = {
 	name: string;
@@ -40,7 +40,9 @@ export type DeferredCommand = {
 
 function tryRefreshAutocomplete(pi: ExtensionAPI): void {
 	try {
-		const ui = (pi as { ui?: { addAutocompleteProvider?: (factory: (provider: unknown) => unknown) => void } }).ui;
+		const ui = (
+			pi as { ui?: { addAutocompleteProvider?: (factory: (provider: unknown) => unknown) => void } }
+		).ui;
 		ui?.addAutocompleteProvider?.((provider) => provider);
 	} catch {
 		// UI is not bound yet, or this is RPC.
@@ -52,7 +54,9 @@ function filterStaticCompletions(
 	prefix: string,
 ): CompletionItem[] | null {
 	if (!items?.length) return null;
-	const mapped = items.map((item) => (typeof item === "string" ? { value: item, label: item } : item));
+	const mapped = items.map((item) =>
+		typeof item === "string" ? { value: item, label: item } : item,
+	);
 	const hits = mapped.filter((item) => item.value.startsWith(prefix));
 	return hits.length > 0 ? hits : null;
 }
@@ -75,7 +79,7 @@ function wrapRuntimePi(
 					try {
 						void handler(saved.event, saved.ctx);
 					} catch (error) {
-						const message = error instanceof Error ? error.stack ?? error.message : String(error);
+						const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
 						console.error(`[pi-lazy-extension] replay ${event} failed: ${message}`);
 					}
 				};
@@ -127,7 +131,7 @@ export function installDeferred(
 					return result;
 				});
 			void ready.catch((error) => {
-				const message = error instanceof Error ? error.stack ?? error.message : String(error);
+				const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
 				console.error(`[pi-lazy-extension] deferred install failed: ${message}`);
 			});
 		}
@@ -140,8 +144,7 @@ export function installDeferred(
 			getArgumentCompletions: (prefix: string) => {
 				void ensure();
 				const real = realCompletions.get(command.name);
-				if (real) return real(prefix);
-				return filterStaticCompletions(command.completions, prefix);
+				return real ? real(prefix) : filterStaticCompletions(command.completions, prefix);
 			},
 			handler: async (args, ctx) => {
 				await ensure();
@@ -149,7 +152,7 @@ export function installDeferred(
 				if (!handler) {
 					throw new Error(`/${command.name} failed to load`);
 				}
-				return handler(args, ctx);
+				await handler(args, ctx);
 			},
 		});
 	}

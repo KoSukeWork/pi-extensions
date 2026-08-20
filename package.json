@@ -6,15 +6,13 @@
   "type": "module",
   "workspaces": [
     "packages/pi-btw",
-    "packages/pi-goal",
     "packages/pi-plan-mode",
     "packages/pi-sync",
     "packages/pi-tui-kit"
   ],
   "pi": {
     "extensions": [
-      "./packages/pi-btw/src/index.ts",
-      "./packages/pi-goal/src/bootstrap.ts",
+      "./packages/pi-btw/src/bootstrap.ts",
       "./packages/pi-plan-mode/src/bootstrap.ts",
       "./packages/pi-sync/src/bootstrap.ts"
     ]
@@ -35,7 +33,6 @@
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "publish-packages": "changeset publish",
     "pack:btw": "npm --workspace @narumitw/pi-btw pack --dry-run",
-    "pack:goal": "npm --workspace @narumitw/pi-goal pack --dry-run",
     "pack:plan-mode": "npm --workspace @narumitw/pi-plan-mode pack --dry-run",
     "pack:sync": "npm --workspace @narumitw/pi-sync pack --dry-run"
   },

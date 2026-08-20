@@ -60,8 +60,8 @@ doctor-all:
 # Make an already-published scoped npm package public if npm view returns 404
 # This does not create a package. For a brand-new package, first run:
 #   npm publish --workspace @narumitw/pi-subagents --access public
-# Usage for existing packages: just npm-public @narumitw/pi-goal
-npm-public package="@narumitw/pi-goal":
+# Usage for existing packages: just npm-public @narumitw/pi-plan-mode
+npm-public package="@narumitw/pi-plan-mode":
     npm access set status=public {{ quote(package) }}
     npm view {{ quote(package) }} version
 

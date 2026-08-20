@@ -5,9 +5,8 @@ export default function (pi: ExtensionAPI) {
 	installDeferred(pi, () => import("./index.js"), {
 		commands: [
 			{
-				name: "goal",
-				description: "Start or manage a goal run",
-				completions: ["pause", "resume", "clear", "edit", "status", "--tokens "],
+				name: "btw",
+				description: "Ask a quick side question without adding it to the main conversation",
 			},
 		],
 	});
