@@ -8,6 +8,12 @@ export default function (pi: ExtensionAPI) {
 		default: false,
 	});
 	installDeferred(pi, () => import("./index.js"), {
-		commands: [{ name: "plan", description: "Enter or manage Codex-like Plan mode" }],
+		commands: [
+			{
+				name: "plan",
+				description: "Enter or manage Codex-like Plan mode",
+				completions: ["start", "show", "finalize", "implement", "save", "export", "exit", "off", "tools"],
+			},
+		],
 	});
 }
