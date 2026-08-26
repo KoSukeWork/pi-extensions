@@ -24,6 +24,7 @@ import {
 } from "./bring-to-main.js";
 import { type RunBtwFullscreen, runBtwFullscreen } from "./fullscreen-ui.js";
 import { pickMainEntry } from "./main-tree-picker.js";
+import { clearBtwUi, rpcAskThreadQuestion, rpcShowThreadComposer } from "./rpc-ui.js";
 import {
 	type BtwCommandMenuResult,
 	type BtwResumeThreadSummary,
@@ -254,8 +255,8 @@ export default function btw(pi: ExtensionAPI, dependencies: BtwExtensionDependen
 		description: "Ask a quick side question without adding it to the main conversation",
 		handler: async (args, ctx) => {
 			const question = args.trim();
-			if (ctx.mode !== "tui") {
-				ctx.ui.notify("/btw requires interactive TUI mode", "error");
+			if (ctx.mode !== "tui" && ctx.mode !== "rpc") {
+				ctx.ui.notify("/btw requires interactive TUI or RPC mode", "error");
 				return;
 			}
 
@@ -266,6 +267,14 @@ export default function btw(pi: ExtensionAPI, dependencies: BtwExtensionDependen
 					menuResult = await showCommandMenu(pi, ctx, listResumeThreads());
 					if (menuResult === "closed") return;
 					if (menuResult !== "tree") break;
+					if (ctx.mode === "rpc") {
+						notifySafely(
+							ctx,
+							"Start from main thread tree is TUI-only. Use /btw <question> or Start side thread.",
+							"warning",
+						);
+						continue;
+					}
 
 					const treeResult = await pickEntry(pi, ctx);
 					if (treeResult.kind === "closed") return;
@@ -313,32 +322,46 @@ export default function btw(pi: ExtensionAPI, dependencies: BtwExtensionDependen
 			}
 			const startingTurnCount = state?.thread.turns.length ?? 0;
 
-			try {
-				await runFullscreen(ctx, (fullscreenCtx) => {
-					if (!state) {
-						const createdAt = Date.now();
-						state = {
-							id: `btw-${nextThreadNumber}`,
-							thread: createSideThread(
-								selectedConversationContext ??
-									buildConversationContext(fullscreenCtx.sessionManager.getBranch()),
-							),
-							thinkingLevel: settings.thinkingLevel ?? pi.getThinkingLevel(),
-							createdAt,
-							updatedAt: createdAt,
-						};
-						nextThreadNumber += 1;
-					}
-					return runThread({
-						initialQuestion: question || undefined,
-						selected: resolution.selected,
-						thinkingLevel: state.thinkingLevel,
-						rememberThinkingLevelChanges:
-							!sameAsMainThinkingLevel && effectiveRememberThinkingLevelChanges(settings),
-						state,
-						ctx: fullscreenCtx,
-					});
+			const startThread = async (runCtx: ExtensionCommandContext) => {
+				if (!state) {
+					const createdAt = Date.now();
+					state = {
+						id: `btw-${nextThreadNumber}`,
+						thread: createSideThread(
+							selectedConversationContext ??
+								buildConversationContext(runCtx.sessionManager.getBranch()),
+						),
+						thinkingLevel: settings.thinkingLevel ?? pi.getThinkingLevel(),
+						createdAt,
+						updatedAt: createdAt,
+					};
+					nextThreadNumber += 1;
+				}
+				return runThread({
+					initialQuestion: question || undefined,
+					selected: resolution.selected,
+					thinkingLevel: state.thinkingLevel,
+					rememberThinkingLevelChanges:
+						!sameAsMainThinkingLevel && effectiveRememberThinkingLevelChanges(settings),
+					state,
+					ctx: runCtx,
+					dependencies:
+						ctx.mode === "rpc"
+							? { ask: rpcAskThreadQuestion, interact: rpcShowThreadComposer }
+							: undefined,
 				});
+			};
+
+			try {
+				if (ctx.mode === "rpc") {
+					try {
+						await startThread(ctx);
+					} finally {
+						clearBtwUi(ctx);
+					}
+				} else {
+					await runFullscreen(ctx, (fullscreenCtx) => startThread(fullscreenCtx));
+				}
 			} finally {
 				if (state?.title && state.thread.turns.length > 0) {
 					if (state.thread.turns.length > startingTurnCount) {
@@ -393,6 +416,19 @@ async function resolveBtwModelWithLoader(
 	settings: BtwSettings,
 	ctx: ExtensionCommandContext,
 ): Promise<ModelResolutionOutcome> {
+	if (ctx.mode === "rpc") {
+		try {
+			const selected = await resolveBtwModel({
+				settings,
+				currentModel: ctx.model,
+				modelRegistry: ctx.modelRegistry,
+				warn: (message) => notifySafely(ctx, message, "warning"),
+			});
+			return selected ? { kind: "selected", selected } : { kind: "unavailable" };
+		} catch {
+			return { kind: "unavailable" };
+		}
+	}
 	return ctx.ui.custom<ModelResolutionOutcome>((tui, theme, _keybindings, done) => {
 		const loader = new BorderedLoader(tui, theme, "Resolving /btw model credentials...");
 		let settled = false;

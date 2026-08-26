@@ -63,7 +63,7 @@ export async function showBtwCommandMenu(
 	ctx: ExtensionCommandContext,
 	options: ShowBtwCommandMenuOptions,
 ): Promise<BtwCommandMenuResult> {
-	if (ctx.mode !== "tui") return "closed";
+	if (ctx.mode !== "tui" && ctx.mode !== "rpc") return "closed";
 	const { defineMenu, runMenu } = await import("@narumitw/pi-tui-kit");
 	if (ctx.signal?.aborted) return "closed";
 	const settingsPath = options.settingsPath ?? btwSettingsPath();
