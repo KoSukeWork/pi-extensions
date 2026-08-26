@@ -59,11 +59,89 @@ type BtwCustomFactory<T> = (
 	done: (result: T) => void,
 ) => Component;
 
+async function showBtwCommandMenuRpc(
+	ctx: ExtensionCommandContext,
+	options: ShowBtwCommandMenuOptions,
+): Promise<BtwCommandMenuResult> {
+	const settingsPath = options.settingsPath ?? btwSettingsPath();
+	const updateSettings = options.updateSettings ?? updateBtwSettings;
+	const resumeThreads = options.resumeThreads ?? [];
+	const levels =
+		options.availableThinkingLevels.length > 0
+			? [...options.availableThinkingLevels]
+			: (["off"] satisfies BtwThinkingLevel[]);
+
+	while (!ctx.signal?.aborted) {
+		const items = [
+			"Start side thread",
+			...(resumeThreads.length > 0 ? ["Resume side thread"] : []),
+			"Settings",
+		];
+		const choice = await ctx.ui.select("Pi BTW", items);
+		if (choice == null) return "closed";
+		if (choice === "Start side thread") return "start";
+		if (choice === "Resume side thread") {
+			const labels = resumeThreads.map((thread) => `${thread.id} · ${thread.title}`);
+			const picked = await ctx.ui.select("Resume BTW side thread", labels);
+			if (picked == null) continue;
+			const thread = resumeThreads.find((item, index) => labels[index] === picked);
+			if (!thread) continue;
+			return { kind: "resume", threadId: thread.id };
+		}
+		if (choice !== "Settings") continue;
+
+		const setting = await ctx.ui.select("Pi BTW Settings", [
+			"Thinking level",
+			"Remember thinking level changes",
+		]);
+		if (setting == null) continue;
+		if (setting === "Thinking level") {
+			const value = await ctx.ui.select("Pi BTW Settings · Thinking level", [
+				SAME_AS_MAIN_THREAD,
+				...levels,
+			]);
+			if (value == null) continue;
+			const patch =
+				value === SAME_AS_MAIN_THREAD
+					? ({ thinkingLevel: undefined } satisfies BtwSettingsPatch)
+					: levels.includes(value as BtwThinkingLevel)
+						? ({ thinkingLevel: value as BtwThinkingLevel } satisfies BtwSettingsPatch)
+						: undefined;
+			if (!patch) continue;
+			try {
+				await updateSettings(patch, { settingsPath, signal: ctx.signal });
+				notifySafely(ctx, `Pi BTW thinking level: ${value}.`, "info");
+			} catch (error) {
+				if (!ctx.signal?.aborted) notifySaveFailure(ctx, error);
+			}
+			continue;
+		}
+		if (setting === "Remember thinking level changes") {
+			const value = await ctx.ui.select("Pi BTW Settings · Remember thinking level changes", [
+				"On",
+				"Off",
+			]);
+			if (value !== "On" && value !== "Off") continue;
+			try {
+				await updateSettings(
+					{ rememberThinkingLevelChanges: value === "On" },
+					{ settingsPath, signal: ctx.signal },
+				);
+				notifySafely(ctx, `Remember thinking level changes: ${value}.`, "info");
+			} catch (error) {
+				if (!ctx.signal?.aborted) notifySaveFailure(ctx, error);
+			}
+		}
+	}
+	return "closed";
+}
+
 export async function showBtwCommandMenu(
 	ctx: ExtensionCommandContext,
 	options: ShowBtwCommandMenuOptions,
 ): Promise<BtwCommandMenuResult> {
-	if (ctx.mode !== "tui" && ctx.mode !== "rpc") return "closed";
+	if (ctx.mode === "rpc") return showBtwCommandMenuRpc(ctx, options);
+	if (ctx.mode !== "tui") return "closed";
 	const { defineMenu, runMenu } = await import("@narumitw/pi-tui-kit");
 	if (ctx.signal?.aborted) return "closed";
 	const settingsPath = options.settingsPath ?? btwSettingsPath();
