@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
-import { it } from "vitest";
 import type { ExtensionEvent } from "@earendil-works/pi-coding-agent";
-import { BLOCKING_EVENTS, REPLAY_EVENTS, STARTUP_EVENTS, installDeferred } from "../src/lazy-extension.js";
+import { it } from "vitest";
+import {
+	BLOCKING_EVENTS,
+	installDeferred,
+	REPLAY_EVENTS,
+	STARTUP_EVENTS,
+} from "../src/lazy-extension.js";
 
 const register = it;
 
 type InstallArgs = Parameters<typeof installDeferred>;
-type InstallOptions = InstallArgs[2];
 type DeferredPi = InstallArgs[0];
 type DeferredLoad = InstallArgs[1];
 type Handler = (event: unknown, ctx: unknown) => unknown;
@@ -136,7 +140,9 @@ type CoveredEvent =
 	| (typeof REPLAY_EVENTS)[number]
 	| (typeof BLOCKING_EVENTS)[number]
 	| (typeof STARTUP_EVENTS)[number];
-type UncoveredEventMustBeNever = [Exclude<ExtensionEvent["type"], CoveredEvent>] extends [never] ? true : never;
+type UncoveredEventMustBeNever = [Exclude<ExtensionEvent["type"], CoveredEvent>] extends [never]
+	? true
+	: never;
 const uncoveredEventCheck: UncoveredEventMustBeNever = true;
 void uncoveredEventCheck;
 
@@ -146,8 +152,14 @@ register("classifies every Pi 0.84.4 extension event (0.84.3 ships a 34-event su
 		assert.ok(covered.has(event), `unclassified event: ${event}`);
 	}
 	assert.strictEqual(covered.size, PI_0_84_4_EVENTS.length);
-	assert.ok(!BLOCKING_EVENTS.includes("resources_discover" as never), "resources_discover must stay a startup capability");
-	assert.ok(!BLOCKING_EVENTS.includes("project_trust" as never), "project_trust must stay a startup capability");
+	assert.ok(
+		!BLOCKING_EVENTS.includes("resources_discover" as never),
+		"resources_discover must stay a startup capability",
+	);
+	assert.ok(
+		!BLOCKING_EVENTS.includes("project_trust" as never),
+		"project_trust must stay a startup capability",
+	);
 });
 
 register("startup events do not load the factory synchronously", async () => {
@@ -163,7 +175,11 @@ register("startup events do not load the factory synchronously", async () => {
 	await emit("project_trust");
 	// Startup dispatches must complete without blocking on the factory; only
 	// the asynchronous session_start warmup may preload it off the hot path.
-	assert.strictEqual(loadCalls, 0, "startup dispatches must not eagerly load an undeclared factory");
+	assert.strictEqual(
+		loadCalls,
+		0,
+		"startup dispatches must not eagerly load an undeclared factory",
+	);
 	await new Promise((resolve) => setTimeout(resolve, 400));
 	assert.strictEqual(loadCalls, 1, "session_start warmup still preloads asynchronously");
 });
@@ -178,7 +194,11 @@ register("declared startup events deliver the real factory into resource discove
 		},
 	})) as unknown as DeferredLoad;
 	installDeferred(pi, load, { startupEvents: ["resources_discover"] });
-	assert.strictEqual((handlers.get("resources_discover") ?? []).length, 1, "declared startup stub must be registered");
+	assert.strictEqual(
+		(handlers.get("resources_discover") ?? []).length,
+		1,
+		"declared startup stub must be registered",
+	);
 	const results = await emit("resources_discover");
 	assert.strictEqual(factoryCalls, 1);
 	const aggregated = results.find(
@@ -188,28 +208,31 @@ register("declared startup events deliver the real factory into resource discove
 	assert.deepStrictEqual(aggregated.skillPaths, ["/skills/late"]);
 });
 
-register("replays session_start after the factory completes and awaits async handlers", async () => {
-	const { pi, emit } = createFakePi();
-	const order: string[] = [];
-	let replayEvent: unknown;
-	const load = (async () => ({
-		default: (runtime: unknown) => {
-			order.push("factory");
-			(runtime as DeferredPi).on("session_start", async (event) => {
-				order.push("replay-start");
-				replayEvent = event;
-				await new Promise((resolve) => setTimeout(resolve, 10));
-				order.push("replay-end");
-			});
-		},
-	})) as unknown as DeferredLoad;
-	installDeferred(pi, load);
-	await emit("session_start", { reason: "startup" });
-	await emit("tool_call");
-	assert.strictEqual(order[0], "factory");
-	assert.deepStrictEqual(order, ["factory", "replay-start", "replay-end"]);
-	assert.strictEqual((replayEvent as { type?: string }).type, "session_start");
-});
+register(
+	"replays session_start after the factory completes and awaits async handlers",
+	async () => {
+		const { pi, emit } = createFakePi();
+		const order: string[] = [];
+		let replayEvent: unknown;
+		const load = (async () => ({
+			default: (runtime: unknown) => {
+				order.push("factory");
+				(runtime as DeferredPi).on("session_start", async (event) => {
+					order.push("replay-start");
+					replayEvent = event;
+					await new Promise((resolve) => setTimeout(resolve, 10));
+					order.push("replay-end");
+				});
+			},
+		})) as unknown as DeferredLoad;
+		installDeferred(pi, load);
+		await emit("session_start", { reason: "startup" });
+		await emit("tool_call");
+		assert.strictEqual(order[0], "factory");
+		assert.deepStrictEqual(order, ["factory", "replay-start", "replay-end"]);
+		assert.strictEqual((replayEvent as { type?: string }).type, "session_start");
+	},
+);
 
 register("contains async replay rejections without failing the install", async () => {
 	const { pi, emit, observed } = createFakePi();
@@ -239,151 +262,182 @@ register("contains async replay rejections without failing the install", async (
 	assert.strictEqual(loadCalls, 1);
 	assert.ok(observed() > 0);
 	assert.ok(
-		recorded.some((line) => line.includes("replay session_start failed") && line.includes("replay handler exploded")),
+		recorded.some(
+			(line) =>
+				line.includes("replay session_start failed") && line.includes("replay handler exploded"),
+		),
 		`replay rejection was not reported: ${recorded.join(" | ")}`,
 	);
 });
 
-register("replays the latest session_start received while an async factory is installing", { timeout: 30000 }, async () => {
-	const { pi, emit } = createFakePi();
-	const received: string[] = [];
-	let releaseFactory!: () => void;
-	const gate = new Promise<void>((resolve) => {
-		releaseFactory = resolve;
-	});
-	const load = (async () => ({
-		default: async (runtime: unknown) => {
-			(runtime as DeferredPi).on("session_start", (event) => {
-				received.push(String((event as { name?: string }).name));
-			});
-			await gate;
-		},
-	})) as unknown as DeferredLoad;
-	installDeferred(pi, load);
-	await emit("session_start", { name: "A" });
-	const installing = emit("tool_call");
-	await new Promise((resolve) => setTimeout(resolve, 20));
-	await emit("session_start", { name: "B" });
-	releaseFactory();
-	await installing;
-	assert.deepStrictEqual(received, ["B"], "stale session A must not be replayed after newer session B");
-});
+register(
+	"replays the latest session_start received while an async factory is installing",
+	{ timeout: 30000 },
+	async () => {
+		const { pi, emit } = createFakePi();
+		const received: string[] = [];
+		let releaseFactory!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			releaseFactory = resolve;
+		});
+		const load = (async () => ({
+			default: async (runtime: unknown) => {
+				(runtime as DeferredPi).on("session_start", (event) => {
+					received.push(String((event as { name?: string }).name));
+				});
+				await gate;
+			},
+		})) as unknown as DeferredLoad;
+		installDeferred(pi, load);
+		await emit("session_start", { name: "A" });
+		const installing = emit("tool_call");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await emit("session_start", { name: "B" });
+		releaseFactory();
+		await installing;
+		assert.deepStrictEqual(
+			received,
+			["B"],
+			"stale session A must not be replayed after newer session B",
+		);
+	},
+);
 
-register("replays a session_start that first arrives while the factory is installing", { timeout: 30000 }, async () => {
-	const { pi, emit } = createFakePi();
-	const received: string[] = [];
-	let releaseFactory!: () => void;
-	const gate = new Promise<void>((resolve) => {
-		releaseFactory = resolve;
-	});
-	const load = (async () => ({
-		default: async (runtime: unknown) => {
-			(runtime as DeferredPi).on("session_start", (event) => {
-				received.push(String((event as { name?: string }).name));
-			});
-			await gate;
-		},
-	})) as unknown as DeferredLoad;
-	installDeferred(pi, load);
-	const installing = emit("tool_call");
-	await new Promise((resolve) => setTimeout(resolve, 20));
-	await emit("session_start", { name: "B" });
-	releaseFactory();
-	await installing;
-	assert.deepStrictEqual(received, ["B"], "handler registered with empty pending must still receive the later event");
-});
+register(
+	"replays a session_start that first arrives while the factory is installing",
+	{ timeout: 30000 },
+	async () => {
+		const { pi, emit } = createFakePi();
+		const received: string[] = [];
+		let releaseFactory!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			releaseFactory = resolve;
+		});
+		const load = (async () => ({
+			default: async (runtime: unknown) => {
+				(runtime as DeferredPi).on("session_start", (event) => {
+					received.push(String((event as { name?: string }).name));
+				});
+				await gate;
+			},
+		})) as unknown as DeferredLoad;
+		installDeferred(pi, load);
+		const installing = emit("tool_call");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await emit("session_start", { name: "B" });
+		releaseFactory();
+		await installing;
+		assert.deepStrictEqual(
+			received,
+			["B"],
+			"handler registered with empty pending must still receive the later event",
+		);
+	},
+);
 
-register("does not expose deferred command completions when the factory fails", { timeout: 30000 }, async () => {
-	const { pi, commands, emit } = createFakePi();
-	let completionCalls = 0;
-	const load: DeferredLoad = async () => ({
-		default: (runtime: unknown) => {
-			(runtime as DeferredPi).registerCommand("demo", {
-				handler: () => undefined,
-				getArgumentCompletions: () => {
-					completionCalls += 1;
-					return [{ value: "real", label: "real" }];
-				},
-			} as never);
-			throw new Error("factory exploded after registering");
-		},
-	});
-	installDeferred(pi, load, {
-		commands: [{ name: "demo", description: "demo command", completions: ["static"] }],
-	});
-	await captureRejection(emit("tool_call"));
-	const stub = commands.get("demo") as { getArgumentCompletions?: (prefix: string) => unknown };
-	const result = stub.getArgumentCompletions?.("");
-	assert.strictEqual(completionCalls, 0, "completions of a failed factory must stay unexposed");
-	assert.deepStrictEqual(result, [{ value: "static", label: "static" }]);
-});
+register(
+	"does not expose deferred command completions when the factory fails",
+	{ timeout: 30000 },
+	async () => {
+		const { pi, commands, emit } = createFakePi();
+		let completionCalls = 0;
+		const load: DeferredLoad = async () => ({
+			default: (runtime: unknown) => {
+				(runtime as DeferredPi).registerCommand("demo", {
+					handler: () => undefined,
+					getArgumentCompletions: () => {
+						completionCalls += 1;
+						return [{ value: "real", label: "real" }];
+					},
+				} as never);
+				throw new Error("factory exploded after registering");
+			},
+		});
+		installDeferred(pi, load, {
+			commands: [{ name: "demo", description: "demo command", completions: ["static"] }],
+		});
+		await captureRejection(emit("tool_call"));
+		const stub = commands.get("demo") as { getArgumentCompletions?: (prefix: string) => unknown };
+		const result = stub.getArgumentCompletions?.("");
+		assert.strictEqual(completionCalls, 0, "completions of a failed factory must stay unexposed");
+		assert.deepStrictEqual(result, [{ value: "static", label: "static" }]);
+	},
+);
 
-register("removes stale completions when a command is replaced without completions", { timeout: 30000 }, async () => {
-	const { pi, commands, emit } = createFakePi();
-	let firstCalls = 0;
-	const load: DeferredLoad = async () => ({
-		default: (runtime: unknown) => {
-			const rt = runtime as DeferredPi;
-			rt.registerCommand("demo", {
-				handler: () => undefined,
-				getArgumentCompletions: () => {
-					firstCalls += 1;
-					return [{ value: "first", label: "first" }];
-				},
-			} as never);
-			rt.registerCommand("demo", { handler: () => undefined } as never);
-		},
-	});
-	installDeferred(pi, load, {
-		commands: [{ name: "demo", description: "demo command", completions: ["static"] }],
-	});
-	await emit("tool_call");
-	const stub = commands.get("demo") as { getArgumentCompletions?: (prefix: string) => unknown };
-	const result = stub.getArgumentCompletions?.("");
-	assert.strictEqual(firstCalls, 0, "stale completion must stop being called after replacement");
-	assert.strictEqual(
-		result,
-		undefined,
-		"replacement without completions must not expose any completion",
-	);
-});
+register(
+	"removes stale completions when a command is replaced without completions",
+	{ timeout: 30000 },
+	async () => {
+		const { pi, commands, emit } = createFakePi();
+		let firstCalls = 0;
+		const load: DeferredLoad = async () => ({
+			default: (runtime: unknown) => {
+				const rt = runtime as DeferredPi;
+				rt.registerCommand("demo", {
+					handler: () => undefined,
+					getArgumentCompletions: () => {
+						firstCalls += 1;
+						return [{ value: "first", label: "first" }];
+					},
+				} as never);
+				rt.registerCommand("demo", { handler: () => undefined } as never);
+			},
+		});
+		installDeferred(pi, load, {
+			commands: [{ name: "demo", description: "demo command", completions: ["static"] }],
+		});
+		await emit("tool_call");
+		const stub = commands.get("demo") as { getArgumentCompletions?: (prefix: string) => unknown };
+		const result = stub.getArgumentCompletions?.("");
+		assert.strictEqual(firstCalls, 0, "stale completion must stop being called after replacement");
+		assert.strictEqual(
+			result,
+			undefined,
+			"replacement without completions must not expose any completion",
+		);
+	},
+);
 
-register("queues a newer session_start that arrives while replay is awaiting", { timeout: 30000 }, async () => {
-	const { pi, emit } = createFakePi();
-	const first: string[] = [];
-	const second: string[] = [];
-	let releaseFirst!: () => void;
-	const gate = new Promise<void>((resolve) => {
-		releaseFirst = resolve;
-	});
-	const load = (async () => ({
-		default: async (runtime: unknown) => {
-			const rt = runtime as DeferredPi;
-			rt.on("session_start", async (event) => {
-				first.push(String((event as { name?: string }).name));
-				if ((event as { name?: string }).name === "B") {
-					await gate;
-				}
-			});
-			rt.on("session_start", (event) => {
-				second.push(String((event as { name?: string }).name));
-			});
-		},
-	})) as unknown as DeferredLoad;
-	installDeferred(pi, load);
-	await emit("session_start", { name: "B" });
-	const installing = emit("tool_call");
-	await new Promise((resolve) => setTimeout(resolve, 20));
-	await emit("session_start", { name: "C" });
-	assert.ok(
-		!first.includes("C") && !second.includes("C"),
-		`C must queue behind the replay instead of racing live handlers: ${JSON.stringify({ first, second })}`,
-	);
-	releaseFirst();
-	await installing;
-	assert.deepStrictEqual(first, ["B", "C"]);
-	assert.deepStrictEqual(second, ["B", "C"]);
-});
+register(
+	"queues a newer session_start that arrives while replay is awaiting",
+	{ timeout: 30000 },
+	async () => {
+		const { pi, emit } = createFakePi();
+		const first: string[] = [];
+		const second: string[] = [];
+		let releaseFirst!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			releaseFirst = resolve;
+		});
+		const load = (async () => ({
+			default: async (runtime: unknown) => {
+				const rt = runtime as DeferredPi;
+				rt.on("session_start", async (event) => {
+					first.push(String((event as { name?: string }).name));
+					if ((event as { name?: string }).name === "B") {
+						await gate;
+					}
+				});
+				rt.on("session_start", (event) => {
+					second.push(String((event as { name?: string }).name));
+				});
+			},
+		})) as unknown as DeferredLoad;
+		installDeferred(pi, load);
+		await emit("session_start", { name: "B" });
+		const installing = emit("tool_call");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await emit("session_start", { name: "C" });
+		assert.ok(
+			!first.includes("C") && !second.includes("C"),
+			`C must queue behind the replay instead of racing live handlers: ${JSON.stringify({ first, second })}`,
+		);
+		releaseFirst();
+		await installing;
+		assert.deepStrictEqual(first, ["B", "C"]);
+		assert.deepStrictEqual(second, ["B", "C"]);
+	},
+);
 register("cancelled warmup does not load the factory after session_shutdown", async () => {
 	const { pi, emit } = createFakePi();
 	let loadCalls = 0;
@@ -418,22 +472,25 @@ register("installs the provided factory once and reuses it across events", async
 	assert.strictEqual(factoryCalls, 1);
 });
 
-register("surfaces the first load error when a retried load resolves a partial namespace", async () => {
-	const { pi, emit } = createFakePi();
-	const attempts: Array<() => Promise<unknown>> = [
-		() => Promise.reject(new Error("Cannot find module 'zod'")),
-		() => Promise.resolve({ default: { notAFactory: true } }),
-	];
-	const load = (async () => {
-		const next = attempts.shift();
-		if (!next) throw new Error("no queued load attempt");
-		return next();
-	}) as unknown as DeferredLoad;
-	installDeferred(pi, load);
-	const error = await captureRejection(emit("tool_call"));
-	assert.match(error.message, /does not export a factory/);
-	assert.match(error.message, /Cannot find module 'zod'/);
-});
+register(
+	"surfaces the first load error when a retried load resolves a partial namespace",
+	async () => {
+		const { pi, emit } = createFakePi();
+		const attempts: Array<() => Promise<unknown>> = [
+			() => Promise.reject(new Error("Cannot find module 'zod'")),
+			() => Promise.resolve({ default: { notAFactory: true } }),
+		];
+		const load = (async () => {
+			const next = attempts.shift();
+			if (!next) throw new Error("no queued load attempt");
+			return next();
+		}) as unknown as DeferredLoad;
+		installDeferred(pi, load);
+		const error = await captureRejection(emit("tool_call"));
+		assert.match(error.message, /does not export a factory/);
+		assert.match(error.message, /Cannot find module 'zod'/);
+	},
+);
 
 register("retries transient load failures and throws the last error", async () => {
 	const { pi, emit } = createFakePi();
@@ -492,47 +549,109 @@ register("shares one deferred attempt across concurrent blocking events", async 
 	assert.strictEqual(factoryCalls, 1);
 });
 
-register("dynamic import of the real runtime module yields a callable factory", { timeout: 120000 }, async () => {
-	const mod = (await import("../src/index.js")) as { default: unknown };
-	assert.strictEqual(typeof mod.default, "function", "real runtime default export must be a factory");
-});
+register(
+	"dynamic import of the real runtime module yields a callable factory",
+	{ timeout: 120000 },
+	async () => {
+		const mod = (await import("../src/index.js")) as { default: unknown };
+		assert.strictEqual(
+			typeof mod.default,
+			"function",
+			"real runtime default export must be a factory",
+		);
+	},
+);
 
-register("installs the real runtime module through the real deferred loader", { timeout: 120000 }, async () => {
-	const { pi, handlers, emit, observed } = createFakePi();
-	const realLoad: DeferredLoad = async () => import("../src/index.js");
-	installDeferred(pi, realLoad);
-	// Snapshot after install: the stub wrappers themselves register handlers,
-	// so growth beyond this point proves the real factory ran.
-	const before = observed();
-	await emit("tool_call");
-	assert.ok(observed() > before, "real factory must register handlers, commands, or tools");
-	// Capability cross-check: a factory that never declared resources_discover
-	// must not register handlers for it.
-	const rdHandlers = (handlers.get("resources_discover") ?? []).length;
-	assert.strictEqual(rdHandlers, 0);
-});
+register(
+	"installs the real runtime module through the real deferred loader",
+	{ timeout: 120000 },
+	async () => {
+		const { pi, handlers, emit, observed } = createFakePi();
+		const realLoad: DeferredLoad = async () => import("../src/index.js");
+		installDeferred(pi, realLoad);
+		// Snapshot after install: the stub wrappers themselves register handlers,
+		// so growth beyond this point proves the real factory ran.
+		const before = observed();
+		await emit("tool_call");
+		assert.ok(observed() > before, "real factory must register handlers, commands, or tools");
+		// Capability cross-check: a factory that never declared resources_discover
+		// must not register handlers for it.
+		const rdHandlers = (handlers.get("resources_discover") ?? []).length;
+		assert.strictEqual(rdHandlers, 0);
+	},
+);
 
-register("real bootstrap declares matching capabilities and loads the real factory", { timeout: 120000 }, async () => {
-	const { pi, handlers, commands, emit, observed } = createFakePi();
-	const bootstrap = (await import("../src/bootstrap.js")).default as (pi: DeferredPi) => unknown;
-	await bootstrap(pi);
-	for (const name of ["btw"]) {
-		assert.ok(commands.has(name), `bootstrap stub command missing: ${name}`);
-	}
-	const startupStubs = (handlers.get("resources_discover") ?? []).length;
-	assert.strictEqual(startupStubs > 0, false, "bootstrap startupEvents must match the declared capability");
-	const before = observed();
-	// Factories may re-register a stub command name (same Map key), so track
-	// object identity: a swapped options object proves the real factory ran.
-	const commandIdentity = new Map(["btw"].map((name) => [name, commands.get(name)]));
-	await emit("tool_call");
-	const realigned = ["btw"].some((name) => commands.get(name) !== commandIdentity.get(name));
-	assert.ok(
-		realigned || observed() > before,
-		"real factory must register or re-register through the loader",
-	);
-	// After a clean install the factory's own resources_discover handler (for
-	// capability repos) has joined the stub: 2 handlers when declared, else 0.
-	const rdHandlers = (handlers.get("resources_discover") ?? []).length;
-	assert.strictEqual(rdHandlers, 0);
-});
+register(
+	"real bootstrap declares matching capabilities and loads the real factory",
+	{ timeout: 120000 },
+	async () => {
+		const { pi, handlers, commands, emit, observed } = createFakePi();
+		const bootstrap = (await import("../src/bootstrap.js")).default as (pi: DeferredPi) => unknown;
+		await bootstrap(pi);
+		for (const name of ["btw"]) {
+			assert.ok(commands.has(name), `bootstrap stub command missing: ${name}`);
+		}
+		const startupStubs = (handlers.get("resources_discover") ?? []).length;
+		assert.strictEqual(
+			startupStubs > 0,
+			false,
+			"bootstrap startupEvents must match the declared capability",
+		);
+		const before = observed();
+		// Factories may re-register a stub command name (same Map key), so track
+		// object identity: a swapped options object proves the real factory ran.
+		const commandIdentity = new Map(["btw"].map((name) => [name, commands.get(name)]));
+		await emit("tool_call");
+		const realigned = ["btw"].some((name) => commands.get(name) !== commandIdentity.get(name));
+		assert.ok(
+			realigned || observed() > before,
+			"real factory must register or re-register through the loader",
+		);
+		// After a clean install the factory's own resources_discover handler (for
+		// capability repos) has joined the stub: 2 handlers when declared, else 0.
+		const rdHandlers = (handlers.get("resources_discover") ?? []).length;
+		assert.strictEqual(rdHandlers, 0);
+	},
+);
+
+register(
+	"registrations during replay and after readiness reach the host exactly once",
+	async () => {
+		const { pi, commands, emit } = createFakePi();
+		let runtime: DeferredPi | undefined;
+		let lateEvents = 0;
+		let replayEvents = 0;
+		let lateStarts = 0;
+		installDeferred(pi, async () => ({
+			default: (api) => {
+				runtime = api;
+				api.on("session_start", () => {
+					api.registerCommand("from-replay", { handler: async () => {} });
+					api.on("turn_start", () => {
+						replayEvents++;
+					});
+				});
+			},
+		}));
+		await emit("session_start");
+		await emit("before_agent_start");
+		assert.ok(commands.has("from-replay"));
+		assert.ok(runtime);
+		runtime.registerCommand("late", { handler: async () => {} });
+		runtime.on("turn_end", () => {
+			lateEvents++;
+		});
+		runtime.on("session_start", () => {
+			lateStarts++;
+		});
+		assert.ok(commands.has("late"));
+		assert.equal(lateStarts, 0, "late handlers must not replay an old session");
+		await emit("turn_start");
+		await emit("turn_end");
+		assert.equal(replayEvents, 1);
+		assert.equal(lateEvents, 1);
+		await emit("session_start");
+		assert.equal(lateStarts, 1);
+		await emit("session_shutdown");
+	},
+);

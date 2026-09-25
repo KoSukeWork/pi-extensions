@@ -9,12 +9,7 @@ import { changedFilesSince, selectAffectedTests } from "./select-affected-tests.
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "node_modules", ".cache", "pi-extensions-test");
-const tsc = path.join(
-	root,
-	"node_modules",
-	".bin",
-	process.platform === "win32" ? "tsc.cmd" : "tsc",
-);
+const tsc = path.join(root, "node_modules", "typescript", "bin", "tsc");
 const vitest = path.join(root, "node_modules", "vitest", "vitest.mjs");
 
 const missingTests = activeExtensionDirectories(path.join(root, "packages"))
@@ -38,7 +33,7 @@ console.log(
 
 if (process.env.PI_EXTENSIONS_BUILD_READY !== "1") runNpm(["run", "build"]);
 fs.rmSync(outDir, { recursive: true, force: true });
-run(tsc, ["-p", "tsconfig.test.json"]);
+run(process.execPath, [tsc, "-p", "tsconfig.test.json"]);
 
 const sourceTestFiles = [
 	...findFiles(path.join(root, "test"), ".test.ts"),

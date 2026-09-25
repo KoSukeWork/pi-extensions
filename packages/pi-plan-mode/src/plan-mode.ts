@@ -98,6 +98,17 @@ export default function planMode(pi: ExtensionAPI, dependencies: PlanModeDepende
 		return interactiveUiPromise;
 	};
 	let state: PlanModeState = { enabled: false, awaitingAction: false };
+	// Neutral host event: tool selectors can ask whether a mode owns the tool set,
+	// even when that mode explicitly opts in to third-party editing tools.
+	let releaseToolPolicy: (() => void) | undefined;
+	function bindToolPolicy() {
+		releaseToolPolicy ??= pi.events?.on("pi:tool-selection-policy", (policy) => {
+			if (state.enabled && policy && typeof policy === "object" && "locked" in policy) {
+				policy.locked = true;
+			}
+		});
+	}
+	bindToolPolicy();
 	let settings: PlanModeSettings = { thinkingLevel: "inherit" };
 	let previousTools: string[] | undefined;
 	let readyPresentationIntent: ReadyPresentationIntent | undefined;
@@ -310,6 +321,7 @@ export default function planMode(pi: ExtensionAPI, dependencies: PlanModeDepende
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		bindToolPolicy();
 		const generation = ++menuGeneration;
 		refreshStateBeforeFirstAgentStart = event.reason === "new";
 		menuController.abort(new DOMException("Plan-mode session replaced", "AbortError"));
@@ -363,6 +375,8 @@ export default function planMode(pi: ExtensionAPI, dependencies: PlanModeDepende
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
+		releaseToolPolicy?.();
+		releaseToolPolicy = undefined;
 		menuGeneration += 1;
 		menuController.abort(new DOMException("Plan-mode session shut down", "AbortError"));
 		readyPresentationIntent = undefined;

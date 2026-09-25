@@ -6,6 +6,8 @@
 
 Pi core intentionally does not ship a built-in plan mode; this package provides one as an independently installable extension.
 
+Tool selectors can query the extension-neutral `pi:tool-selection-policy` event through Pi's public event bus with a mutable `{ locked: false }` payload. Plan mode sets `locked` to `true` while active, including when custom tools are selected. The subscription is released on shutdown and restored on session start.
+
 ## ✨ Features
 
 - Adds a state-aware `/plan` launch and management menu, plus `/plan start` for direct activation.

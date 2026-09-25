@@ -1072,3 +1072,60 @@ test("proposed-plan helpers extract and remove plan blocks", () => {
 		"answer",
 	);
 });
+
+test("tool-selection policy follows Plan state and releases its session subscription", async () => {
+	const mock = createMockPi({
+		activeTools: ["read", "apply_patch"],
+		allTools: ["read", "apply_patch"].map((name) => ({
+			name,
+			description: name,
+			parameters: { type: "object", properties: {} },
+			sourceInfo: { source: name === "read" ? "builtin" : "extension" },
+		})),
+	});
+	let subscriptions = 0;
+	const subscribe = mock.eventBus.on.bind(mock.eventBus);
+	mock.eventBus.on = (channel, handler) => {
+		if (channel !== "pi:tool-selection-policy") return subscribe(channel, handler);
+		subscriptions++;
+		const release = subscribe(channel, handler);
+		return () => {
+			subscriptions--;
+			release();
+		};
+	};
+	planMode(mock.pi, {
+		readSettings: async () => ({
+			kind: "loaded",
+			settings: { thinkingLevel: "inherit", defaultPlanTools: ["read", "apply_patch"] },
+		}),
+	});
+	const { ctx } = createMockContext();
+	const locked = () => {
+		const policy = { locked: false };
+		mock.eventBus.emit("pi:tool-selection-policy", policy);
+		return policy.locked;
+	};
+	const start = mock.events.get("session_start")?.[0];
+	const shutdown = mock.events.get("session_shutdown")?.[0];
+	const command = mock.commands.get("plan");
+	assert.ok(start && shutdown && command);
+	await start({}, ctx);
+	assert.equal(locked(), false);
+	await command.handler("start", ctx);
+	assert.ok(mock.rawPi.getActiveTools().includes("apply_patch"));
+	assert.equal(locked(), true);
+	await shutdown({}, ctx);
+	await shutdown({}, ctx);
+	assert.equal(subscriptions, 0);
+	assert.equal(locked(), false);
+	await start({}, ctx);
+	await start({}, ctx);
+	assert.equal(subscriptions, 1);
+	await command.handler("start", ctx);
+	assert.equal(locked(), true);
+	await command.handler("exit", ctx);
+	assert.equal(locked(), false);
+	await shutdown({}, ctx);
+	assert.equal(subscriptions, 0);
+});
